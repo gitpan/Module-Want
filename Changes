@@ -1,5 +1,9 @@
 Revision history for Module-Want
 
+0.2  Thu Jul 22 22:55:15 2010
+    Added is_ns(), get_inc_key(), and get_clean_ns() convenience functions. 
+    (For an entire suite if name space utilities see Module::Util and friends)
+        
 0.1  Mon May 24 23:25:16 2010
        Initial release.
 

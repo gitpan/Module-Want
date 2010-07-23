@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Module-Want
-version:             0.1
+version:             0.2
 abstract:            Check @INC once for modules that you want but may not have
 license:             ~
 author:              

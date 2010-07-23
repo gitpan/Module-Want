@@ -3,7 +3,7 @@ package Module::Want;
 # use warnings;
 # use strict;
 
-$Module::Want::VERSION = '0.1';
+$Module::Want::VERSION = '0.2';
 
 my %lookup;
 
@@ -12,19 +12,40 @@ my %lookup;
 # my %tries;
 # sub _get_debugs_refs { return \%lookup, \%tries }
 
+sub is_ns { $_[0] =~ m/\A[A-Za-z_][A-Za-z0-9_]*(?:(?:\:\:|\')[A-Za-z0-9_]+)*\z/ }
+
+sub get_inc_key {
+    return if !is_ns( $_[0] );
+
+    # %INC keys are always unix format so no need for File::Spec
+    #   if I've been misinformed of that fact then please let me know, thanks
+    my $key = $_[0] . '.pm';
+    $key =~ s{(?:\:\:|\')}{/}g;
+    return $key;
+}
+
+sub get_clean_ns {
+    my $dirty = $_[0];
+    $dirty =~ s{^\s+}{};
+    $dirty =~ s{\s+$}{};
+    $dirty =~ s{\'}{::}g;
+    return $dirty;
+}
+
 sub have_mod {
-    my ($ns, $skip_cache) = @_;
-    $skip_cache ||= 0 ;
-    
-    if ( $ns !~ m/^\A[A-Za-z_](?:[A-Za-z0-9_]*)(?:(?:\:\:|\')[A-Za-z0-9_]+)*\z/ ) {
+    my ( $ns, $skip_cache ) = @_;
+    $skip_cache ||= 0;
+
+    if ( !is_ns($ns) ) {
         require Carp;
         Carp::carp('Invalid Namespace');
         return;
     }
 
     if ( $skip_cache || !exists $lookup{$ns} ) {
+
         $lookup{$ns} = 0;
-        # $tries{$ns}++;
+        $tries{$ns}++;
         eval qq{
            require $ns;
            \$lookup{\$ns}++;
@@ -42,7 +63,14 @@ sub import {
     *{ caller() . '::have_mod' } = \&have_mod;
 
     for my $ns (@_) {
-        have_mod($ns);
+        next if $ns eq 'have_mod';
+
+        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' ) {
+            *{ caller() . "::$ns" } = \&{$ns};
+        }
+        else {
+            have_mod($ns);
+        }
     }
 }
 
@@ -56,7 +84,7 @@ Module::Want - Check @INC once for modules that you want but may not have
 
 =head1 VERSION
 
-This document describes Module::Want version 0.1
+This document describes Module::Want version 0.2
 
 =head1 SYNOPSIS
 
@@ -122,6 +150,46 @@ You can give it a second true argument to skip using the value from the last tim
 You can use() it with a list to call have_mod() on:
 
    use Module::Want qw(X Y Z); # calls have_mod('X'), have_mod('Y'), and have_mod('Z')
+
+=head2 Utility functions
+
+These aren't the real reasons for this module but they've proven useful when you're doing things that would require have_mod() so here they are:
+
+They can all be exported.
+
+For an entire suite if name space utilities see L<Module::Util> and friends.
+
+=head3 is_ns($ns)
+
+Boolean of if '$ns' is a proper name space or not.
+
+    if(is_ns($ns)) {
+        ... use $ns as a module/class name ...
+    }
+    else {
+       ... "invalid input please try again" prompt ...
+    }
+
+=head3 get_inc_key($ns) 
+
+Returns what $ns's key in %INC would be (if is_ns($ns) of course)
+
+    if (my $inc_key =  get_inc_key($ns)) {
+        if (exists $INC{$inc_key}) {
+           ... in %INC ...
+        }
+        else {
+            ... not in %INC ...
+        }    
+    }
+
+%INC keys are always unix format so don't panic
+
+If I've been misinformed of that fact then please let me know, thanks
+
+=head3 get_clean_ns($ns)
+
+Takes $ns, trims leading and trailing whitespace and turns ' into ::, and returns the cleaned copy.
 
 =head1 DIAGNOSTICS
 
