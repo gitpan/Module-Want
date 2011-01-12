@@ -1,4 +1,4 @@
-use Test::More tests => 36;
+use Test::More tests => 37;
 use Test::Carp;
 
 BEGIN {
@@ -8,6 +8,8 @@ BEGIN {
 diag( "Testing Module::Want $Module::Want::VERSION" );
 
 ok(defined &have_mod, 'imports have_mod() ok');
+
+is( ref( Module::Want::get_ns_regexp() ), 'Regexp', 'get_ns_regexp() returns a regexp');
 
 ok(have_mod('Module::Want'), 'true on already loaded module');
 ok(have_mod('Module::Want'), 'true on already loaded module');
@@ -44,7 +46,7 @@ ok(defined &get_inc_key, 'can import get_inc_key() ok');
 ok(defined &is_ns, 'can import is_ns() ok');
 
 SKIP: {
-    skip 'We are not in dev testing mode', 5 if !defined $Module::Want::DevTesting;
+    skip 'We are not in dev testing mode', 5 if !defined $Module::Want::DevTesting || !$Module::Want::DevTesting;
     
     is_deeply(
         [ Module::Want::_get_debugs_refs() ],

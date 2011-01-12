@@ -3,7 +3,7 @@ package Module::Want;
 # use warnings;
 # use strict;
 
-$Module::Want::VERSION = '0.2';
+$Module::Want::VERSION = '0.3';
 
 my %lookup;
 
@@ -12,7 +12,11 @@ my %lookup;
 # my %tries;
 # sub _get_debugs_refs { return \%lookup, \%tries }
 
-sub is_ns { $_[0] =~ m/\A[A-Za-z_][A-Za-z0-9_]*(?:(?:\:\:|\')[A-Za-z0-9_]+)*\z/ }
+my $ns_regexp = qr/[A-Za-z_][A-Za-z0-9_]*(?:(?:\:\:|\')[A-Za-z0-9_]+)*/;
+
+sub get_ns_regexp { return $ns_regexp }
+
+sub is_ns { $_[0] =~ m/\A$ns_regexp\z/ }
 
 sub get_inc_key {
     return if !is_ns( $_[0] );
@@ -45,7 +49,7 @@ sub have_mod {
     if ( $skip_cache || !exists $lookup{$ns} ) {
 
         $lookup{$ns} = 0;
-        $tries{$ns}++;
+#        $tries{$ns}++;
         eval qq{
            require $ns;
            \$lookup{\$ns}++;
@@ -65,7 +69,7 @@ sub import {
     for my $ns (@_) {
         next if $ns eq 'have_mod';
 
-        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' ) {
+        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' || $ns eq 'get_ns_regexp') {
             *{ caller() . "::$ns" } = \&{$ns};
         }
         else {
@@ -84,7 +88,7 @@ Module::Want - Check @INC once for modules that you want but may not have
 
 =head1 VERSION
 
-This document describes Module::Want version 0.2
+This document describes Module::Want version 0.3
 
 =head1 SYNOPSIS
 
@@ -155,7 +159,9 @@ You can use() it with a list to call have_mod() on:
 
 These aren't the real reasons for this module but they've proven useful when you're doing things that would require have_mod() so here they are:
 
-They can all be exported.
+They can all be exported thusly:
+
+    use Module::Want qw(is_ns);
 
 For an entire suite if name space utilities see L<Module::Util> and friends.
 
@@ -169,6 +175,10 @@ Boolean of if '$ns' is a proper name space or not.
     else {
        ... "invalid input please try again" prompt ...
     }
+
+=head3 get_ns_regexp()
+
+Returns a quoted Regexp that matches a name space for us in your regexes.
 
 =head3 get_inc_key($ns) 
 
