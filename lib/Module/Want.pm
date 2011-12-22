@@ -3,7 +3,7 @@ package Module::Want;
 # use warnings;
 # use strict;
 
-$Module::Want::VERSION = '0.3';
+$Module::Want::VERSION = '0.4';
 
 my %lookup;
 
@@ -17,6 +17,10 @@ my $ns_regexp = qr/[A-Za-z_][A-Za-z0-9_]*(?:(?:\:\:|\')[A-Za-z0-9_]+)*/;
 sub get_ns_regexp { return $ns_regexp }
 
 sub is_ns { $_[0] =~ m/\A$ns_regexp\z/ }
+
+sub get_all_use_require_in_text {
+    return $_[0] =~ m/(?:^\s*|\;\s*|eval[^;]+)(?:use|require)\s+($ns_regexp)/g;
+}
 
 sub get_inc_key {
     return if !is_ns( $_[0] );
@@ -49,7 +53,8 @@ sub have_mod {
     if ( $skip_cache || !exists $lookup{$ns} ) {
 
         $lookup{$ns} = 0;
-#        $tries{$ns}++;
+
+        #        $tries{$ns}++;
         eval qq{
            require $ns;
            \$lookup{\$ns}++;
@@ -63,14 +68,16 @@ sub have_mod {
 sub import {
     shift;
 
+    my $caller = caller();
+
     # no strict 'refs';
-    *{ caller() . '::have_mod' } = \&have_mod;
+    *{ $caller . '::have_mod' } = \&have_mod;
 
     for my $ns (@_) {
         next if $ns eq 'have_mod';
 
-        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' || $ns eq 'get_ns_regexp') {
-            *{ caller() . "::$ns" } = \&{$ns};
+        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' || $ns eq 'get_ns_regexp' || $ns eq 'get_all_use_require_in_text' ) {
+            *{ $caller . "::$ns" } = \&{$ns};
         }
         else {
             have_mod($ns);
@@ -88,7 +95,7 @@ Module::Want - Check @INC once for modules that you want but may not have
 
 =head1 VERSION
 
-This document describes Module::Want version 0.3
+This document describes Module::Want version 0.4
 
 =head1 SYNOPSIS
 
@@ -179,6 +186,14 @@ Boolean of if '$ns' is a proper name space or not.
 =head3 get_ns_regexp()
 
 Returns a quoted Regexp that matches a name space for us in your regexes.
+
+=head3 get_all_use_require_in_text($text)
+
+This will return a list of all name spaces being use()d or require()d in perlish looking $text.
+
+It will also return ones being eval()d in.
+
+It is very simplistic (e.g. it may or may not return use/require statements that are in comments, it will match verbiage in a here doc that start w/ “use”) so if it does not fit your needs you'll need to try a L<PPI> based solution (I have L<Perl::DependList> on my radar that does just that.). 
 
 =head3 get_inc_key($ns) 
 

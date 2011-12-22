@@ -1,5 +1,9 @@
 Revision history for Module-Want
 
+0.4  Wed Dec 21 22:53:38 2011
+    - add get_all_use_require_in_text()
+    - rt 68354 - make qw() (qw()) so tests don't emit warnings under perl 5.14
+    
 0.3  Tue Jan 11 23:10:12 2011
     Added get_ns_regexp() convenience function
     
