@@ -1,9 +1,11 @@
 package Module::Want;
 
-# use warnings;
-# use strict;
+use strict;
+*normalize_ns            = \&get_clean_ns;    # do before warnings to prevent 'only used once' warning
+*get_relative_path_of_ns = \&get_inc_key;     # do before warnings to prevent 'only used once' warning
+use warnings;
 
-$Module::Want::VERSION = '0.4';
+$Module::Want::VERSION = '0.5';
 
 my %lookup;
 
@@ -32,6 +34,21 @@ sub get_inc_key {
     return $key;
 }
 
+sub distname2ns {
+    my ($node) = @_;
+    $node =~ s/-/::/g;
+    my $ns = get_clean_ns($node);
+    return $ns if is_ns($ns);
+    return;
+}
+
+sub ns2distname {
+    my $node = get_clean_ns( $_[0] );
+    return if !is_ns($node);
+    $node =~ s/::/-/g;
+    return $node;
+}
+
 sub get_clean_ns {
     my $dirty = $_[0];
     $dirty =~ s{^\s+}{};
@@ -55,13 +72,40 @@ sub have_mod {
         $lookup{$ns} = 0;
 
         #        $tries{$ns}++;
-        eval qq{
-           require $ns;
-           \$lookup{\$ns}++;
-        };
+        eval qq{require $ns;\$lookup{\$ns}++;};    ## no critic
     }
 
     return $lookup{$ns} if $lookup{$ns};
+    return;
+}
+
+sub get_inc_path_via_have_mod {
+    my ( $ns, $skip_cache ) = @_;
+    return unless have_mod( $ns, $skip_cache );
+    return $INC{ get_inc_key($ns) };
+}
+
+sub search_inc_paths {
+    my ( $ns, $want_abs ) = @_;
+
+    have_mod('File::Spec') || return;
+
+    my $rel_path = File::Spec->catfile( split( m{/}, get_relative_path_of_ns($ns) ) );
+    my $return_first = wantarray ? 0 : 1;
+    my @result;
+
+    for my $path (@INC) {
+        my $abspath = File::Spec->rel2abs( $rel_path, $path );
+        if ( -f $abspath ) {
+            push @result, ( $want_abs ? $abspath : $path );
+            last if $return_first;
+        }
+    }
+
+    if (@result) {
+        return $result[0] if $return_first;
+        return @result;
+    }
     return;
 }
 
@@ -70,13 +114,13 @@ sub import {
 
     my $caller = caller();
 
-    # no strict 'refs';
+    no strict 'refs';    ## no critic
     *{ $caller . '::have_mod' } = \&have_mod;
 
     for my $ns (@_) {
         next if $ns eq 'have_mod';
 
-        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' || $ns eq 'get_ns_regexp' || $ns eq 'get_all_use_require_in_text' ) {
+        if ( $ns eq 'is_ns' || $ns eq 'get_inc_key' || $ns eq 'get_clean_ns' || $ns eq 'get_ns_regexp' || $ns eq 'get_all_use_require_in_text' || $ns eq 'get_relative_path_of_ns' || $ns eq 'normalize_ns' || $ns eq 'get_inc_path_via_have_mod' || $ns eq 'search_inc_paths' || $ns eq 'distname2ns' || $ns eq 'ns2distname' ) {
             *{ $caller . "::$ns" } = \&{$ns};
         }
         else {
@@ -89,13 +133,15 @@ sub import {
 
 __END__
 
+=encoding utf-8
+
 =head1 NAME
 
 Module::Want - Check @INC once for modules that you want but may not have
 
 =head1 VERSION
 
-This document describes Module::Want version 0.4
+This document describes Module::Want version 0.5
 
 =head1 SYNOPSIS
 
@@ -185,7 +231,7 @@ Boolean of if '$ns' is a proper name space or not.
 
 =head3 get_ns_regexp()
 
-Returns a quoted Regexp that matches a name space for us in your regexes.
+Returns a quoted Regexp that matches a name space for use in your regexes.
 
 =head3 get_all_use_require_in_text($text)
 
@@ -212,9 +258,46 @@ Returns what $ns's key in %INC would be (if is_ns($ns) of course)
 
 If I've been misinformed of that fact then please let me know, thanks
 
+=head4 get_relative_path_of_ns($ns)
+
+Alias of L</get_inc_key($ns)> whose name indicates a different intent.
+
 =head3 get_clean_ns($ns)
 
 Takes $ns, trims leading and trailing whitespace and turns ' into ::, and returns the cleaned copy.
+
+=head4 normalize_ns($ns)
+
+Alias of L</get_clean_ns($ns)> whose name indicates a different intent.
+
+=head3 ns2distname($ns)
+
+Turns the given name space into a distribution name.
+
+e.g. Foo::Bar::Baz becomes Foo-Bar-Baz
+
+=head3 distname2ns($distname)
+
+Turns the given distribution name into a name space.
+
+e.g. Foo-Bar-Baz becomes Foo::Bar::Baz
+
+=head3 get_inc_path_via_have_mod($ns)
+
+Return the %INC entry’s value if we have_mod($ns);
+
+=head3 search_inc_paths($ns)
+
+Without loading the module, search for $ns in @INC.
+
+In scalar context returns the first path it is found in, in list context returns all paths it is found in.
+
+    my $first_path_it_is_in = search_inc_paths($ns);
+    my @all_paths_it_is_in  = search_inc_paths($ns);
+
+By default it returns the path it is in without the module-name part of the path. A second true argument will return the entire path.
+
+    my $abs_path_of_pm_file = search_inc_paths($ns,1);
 
 =head1 DIAGNOSTICS
 

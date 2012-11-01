@@ -1,5 +1,10 @@
-use Test::More tests => 43;
+use Test::More tests => 64;
 use Test::Carp;
+
+# for search_inc_paths() tests
+use File::Temp;
+use File::Spec;
+use File::Path::Tiny;
 
 BEGIN {
     use_ok('Module::Want');
@@ -44,6 +49,74 @@ ok( Module::Want::get_inc_key('Acme\'ABC\'DEF\'X\'Y\'Z') eq 'Acme/ABC/DEF/X/Y/Z.
 Module::Want->import( 'get_inc_key', 'is_ns' );
 ok( defined &get_inc_key, 'can import get_inc_key() ok' );
 ok( defined &is_ns,       'can import is_ns() ok' );
+
+Module::Want->import( 'get_relative_path_of_ns', 'normalize_ns' );
+ok( defined &get_relative_path_of_ns, 'can import get_relative_path_of_ns() ok' );
+ok( defined &normalize_ns,            'can import normalize_ns() ok' );
+is( \&get_relative_path_of_ns, \&get_inc_key, 'get_relative_path_of_ns() is the same as get_inc_key()' );
+is( \&normalize_ns, \&Module::Want::get_clean_ns, 'get_relative_path_of_ns() is the same as get_inc_key()' );
+
+Module::Want->import('get_inc_path_via_have_mod');
+ok( defined &get_inc_path_via_have_mod, 'get_inc_path_via_have_mod() imported ok' );
+ok( $INC{'Test/More.pm'},               'Sanity check that test value is set' );
+is( get_inc_path_via_have_mod('Test::More'), $INC{'Test/More.pm'}, 'get_inc_path_via_have_mod() returns the INC value' );
+is( get_inc_path_via_have_mod('lkadjnvlkand::lvknadkjcnakjdnvjka'), undef, 'get_inc_path_via_have_mod() returns false on unloadable modules' );
+
+Module::Want->import( 'distname2ns', 'ns2distname' );
+ok( defined &distname2ns, 'distname2ns() imported ok' );
+ok( defined &ns2distname, 'ns2distname() imported ok' );
+is( ns2distname('Foo'),                              'Foo',                'ns2distname() one one chunk' );
+is( distname2ns('Foo'),                              'Foo',                'distname2ns() one one chunk' );
+is( ns2distname('Foo::Bar\'baz::Wop'),               'Foo-Bar-baz-Wop',    'ns2distname() one multi chunk (quote and colon mixed)' );
+is( distname2ns('Foo-Bar-baz-Wop'),                  'Foo::Bar::baz::Wop', 'distname2ns() one multi chunk' );
+is( ns2distname('This is not a name space.'),        undef,                'ns2distname() one invalid arg' );
+is( distname2ns('This is not a distribution name.'), undef,                'distname2ns() one invalid arg' );
+
+{
+    Module::Want->import('search_inc_paths');
+    ok( defined &search_inc_paths, 'search_inc_paths() imported ok' );
+
+    my $n = 'Foo::Bar';
+
+    my $dir = File::Temp->newdir();
+    local @INC = ();
+    my @ins;
+    my @pms;
+
+    for my $p (qw(a b c/d e/f/g b/Foo e/f/g/Foo)) {
+        my $path = File::Spec->catdir( $dir, split( m{/}, $p ) );
+
+        File::Path::Tiny::mk($path) || die "Could not setup test dir “$path”: $!";
+
+        if ( $path =~ m/Foo$/ ) {
+            my $pm = File::Spec->catfile( $path, 'Bar.pm' );
+
+            open my $fh, '>', $pm or die "Could not write “$pm”: $!";
+            print {$fh} '1;';
+            close $fh;
+
+            my @parts = File::Spec->splitdir($path);
+            pop @parts;
+            my $path_minus_foo = File::Spec->catdir(@parts);
+
+            push @ins, $path_minus_foo;
+            push @pms, $pm;
+        }
+        else {
+            push @INC, $path;    # even though b/Foo woudl get b created we loop through b as well as b/Foo so b is added but b/Foo is not
+        }
+    }
+
+    my $first = search_inc_paths($n);
+    is( $first, $ins[0], 'search_inc_paths() scalar context' );
+    my @all = search_inc_paths($n);
+    is_deeply( \@all, \@ins, 'search_inc_paths() array context' );
+
+    my $abs_first = search_inc_paths( $n, 1 );
+    is( $abs_first, $pms[0], 'search_inc_paths() scalar context w/ abspath boolean' );
+    my @abs_all = search_inc_paths( $n, 1 );
+    is_deeply( \@abs_all, \@pms, 'search_inc_paths() array context w/ abspath boolean' );
+}
 
 is_deeply(
     [
