@@ -1,5 +1,8 @@
 Revision history for Module-Want
 
+0.6  Fri Oct 25 11:13:39 2013
+    - prevent benign eval from tripping potentially fatal sig handler
+
 0.5  Wed Oct 31 19:44:04 2012
     - re-enabled strict/warnings
     - make POD tests RELEASE_TESTING tests

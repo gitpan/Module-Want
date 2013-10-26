@@ -5,7 +5,7 @@ use strict;
 *get_relative_path_of_ns = \&get_inc_key;     # do before warnings to prevent 'only used once' warning
 use warnings;
 
-$Module::Want::VERSION = '0.5';
+$Module::Want::VERSION = '0.6';
 
 my %lookup;
 
@@ -72,6 +72,7 @@ sub have_mod {
         $lookup{$ns} = 0;
 
         #        $tries{$ns}++;
+        local $SIG{__DIE__};                       # prevent benign eval from tripping potentially fatal sig handler
         eval qq{require $ns;\$lookup{\$ns}++;};    ## no critic
     }
 
@@ -141,7 +142,7 @@ Module::Want - Check @INC once for modules that you want but may not have
 
 =head1 VERSION
 
-This document describes Module::Want version 0.5
+This document describes Module::Want version 0.6
 
 =head1 SYNOPSIS
 
@@ -181,6 +182,8 @@ This searches @INC for X.pm once:
             ... do X-alternative code ...
         }
     }
+
+Additionally, it will not trip the sig die handler. That prevents a benign eval from tripping a potentially fatal sig handler. (i.e. another step you'd have to do manually with the straight eval form.)
 
 =head1 INTERFACE 
 
